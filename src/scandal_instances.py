@@ -31,34 +31,29 @@ is now simply the `DisguisedAs` edge itself, pointed at directly by
 `KnewAt`.
 """
 
-import importlib
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
-_s = importlib.import_module("2_HolmesSchema")
-
-AssociatedWith   = _s.AssociatedWith
-BaseStatement    = _s.BaseStatement
-DisguisedAs      = _s.DisguisedAs
-Document         = _s.Document
-Event            = _s.Event
-Executes         = _s.Executes
-HasTrueIdentity  = _s.HasTrueIdentity
-Involves         = _s.Involves
-KnewAt           = _s.KnewAt
-Knows            = _s.Knows
-Location         = _s.Location
-LocatedIn        = _s.LocatedIn
-Moment           = _s.Moment
-Object           = _s.Object
-OccurredAt       = _s.OccurredAt
-Person           = _s.Person
-Persona          = _s.Persona
-Plan             = _s.Plan
-Possesses        = _s.Possesses
-TruthStatus      = _s.TruthStatus
-statement_id     = _s.statement_id
+from holmes_schema import (
+    AssociatedWith,
+    BaseStatement,
+    DisguisedAs,
+    Document,
+    Event,
+    Executes,
+    HasTrueIdentity,
+    Involves,
+    KnewAt,
+    Knows,
+    Location,
+    LocatedIn,
+    Moment,
+    Object,
+    OccurredAt,
+    Person,
+    Persona,
+    Plan,
+    Possesses,
+    TruthStatus,
+    statement_id,
+)
 
 
 """

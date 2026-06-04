@@ -15,5 +15,8 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
 [tool.pdm]
 distribution = true
