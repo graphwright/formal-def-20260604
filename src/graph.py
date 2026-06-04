@@ -7,10 +7,8 @@ BFS and named queries directly against the Python objects.
 Typical usage:
 
     from graph import Graph
-    import importlib, sys
-    sys.path.insert(0, '.')
-    instances = importlib.import_module('4_ScandalInstances')
-    g = Graph.from_module(instances)
+    import scandal_instances
+    g = Graph.from_module(scandal_instances)
     g.bfs(['sib:persona:count_von_kramm'], max_hops=2)
 """
 
