@@ -1,5 +1,7 @@
 # Principles of Reliable Reasoning: Formal Definition
 
+This is stuff from [this GH gist](https://gist.github.com/wware/b6ec395549569fc217744ec27bcfcb18).
+
 This defines the formal model precisely, establishes vocabulary, states hard rules,
 and lists explicit non-goals. When in doubt, check against this file before generating
 code, prose, or schema definitions.

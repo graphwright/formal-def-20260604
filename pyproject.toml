@@ -1,0 +1,19 @@
+[project]
+name = "formal-def-20260604"
+version = "0.1.0"
+description = "Docs and examples of typed graph"
+authors = [
+    {name = "Will Ware", email = "will.ware@gmail.com"},
+]
+dependencies = ["pydantic>=2.13.4", "mypy>=2.1.0", "typing>=3.7.4.3", "pytest>=9.0.3"]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
