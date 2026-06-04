@@ -17,7 +17,14 @@ def g() -> Graph:
     return Graph.from_module(i)
 
 
-# ── Sanity check ──────────────────────────────────────────────────────────────
+"""
+## Sanity check — graph structure
+
+Verify that `Graph.from_module` correctly indexes all entity instances from
+the scandal graph: at least one plain entity and at least one predicate
+instance (statement), and that the two counts sum to the total.
+"""
+
 
 def test_graph_loaded(g):
     all_instances = list(g.by_id.values())
@@ -28,8 +35,15 @@ def test_graph_loaded(g):
     assert len(all_instances) == len(plain) + len(stmts)
 
 
-# ── Query 1: Identity ─────────────────────────────────────────────────────────
-# Who IS Count Von Kramm?
+"""
+## Q1 — Identity: `HasTrueIdentity` is Functional
+
+Count Von Kramm is the alias the King uses when visiting Baker Street.
+`HasTrueIdentity` carries the `Functional` trait, meaning a persona conceals
+exactly one real person. The query asserts that exactly one `HasTrueIdentity`
+edge exists from `count_von_kramm` and that it resolves to the King of Bohemia.
+"""
+
 
 def test_has_true_identity_is_functional(g):
     # HasTrueIdentity is Functional — exactly one answer
@@ -38,8 +52,16 @@ def test_has_true_identity_is_functional(g):
     assert edges[0].object_.id == i.king_of_bohemia.id
 
 
-# ── Query 2: Inverse ──────────────────────────────────────────────────────────
-# What personas did Holmes adopt?
+"""
+## Q2 — Inverse: `DisguisedAs` ↔ `HasTrueIdentity`
+
+`DisguisedAs` and `HasTrueIdentity` are declared inverses. This query checks
+two things: that Holmes has exactly one disguise in this story (the
+nonconformist clergyman), and that `get_inverse(DisguisedAs)` returns
+`HasTrueIdentity` at runtime via the `__orig_bases__` inspection in
+`holmes_schema.py`.
+"""
+
 
 def test_holmes_disguised_as_clergyman_only(g):
     edges = g.edges_from(i.holmes.id, pred_type=schema.DisguisedAs)
@@ -52,8 +74,15 @@ def test_disguised_as_inverse_is_has_true_identity():
     assert inv is schema.HasTrueIdentity
 
 
-# ── Query 3: Transitive location ──────────────────────────────────────────────
-# Is Briony Lodge in London, without an explicit edge?
+"""
+## Q3 — Transitive location: Briony Lodge is in London
+
+`LocatedIn` is `Transitive`. There is no direct edge from Briony Lodge to
+London; the chain runs `Briony Lodge → St. John's Wood → London`. This query
+computes the inward transitive closure of `LocatedIn` from `london` and
+asserts that both Briony Lodge and St. John's Wood appear in the result.
+"""
+
 
 def _transitive_in(g: Graph, entity_id: str, pred_type) -> set[str]:
     # Inward transitive closure: things that are LocatedIn london
@@ -80,8 +109,15 @@ def test_briony_lodge_in_london_transitively(g):
     # Briony Lodge is in London via St. John's Wood (no explicit edge needed)
 
 
-# ── Query 4: Event participants ───────────────────────────────────────────────
-# Who was involved in the fake fire alarm?
+"""
+## Q4 — Event participants: `Involves`
+
+The fake fire alarm is the pivotal scene in which Holmes, disguised as the
+nonconformist clergyman, stages a false alarm at Briony Lodge. Because Holmes
+attended in disguise, the `Involves` edge names the `Persona`, not the
+`Person` — the real identity is recoverable via `HasTrueIdentity`.
+"""
+
 
 def test_fake_fire_alarm_participants(g):
     involves = g.edges_from(i.evt_fake_fire_alarm.id, pred_type=schema.Involves)
@@ -91,8 +127,17 @@ def test_fake_fire_alarm_participants(g):
     assert i.irene_adler.id in participants
 
 
-# ── Query 5: Epistemic query ──────────────────────────────────────────────────
-# What does Watson know, and about what propositions?
+"""
+## Q5 — Epistemic: higher-order `KnewAt`
+
+`KnewAt` takes a `BaseStatement` as its `object_` — any predicate instance
+can serve as the known proposition. This query verifies that Watson has
+exactly two `KnewAt` edges and that their `object_` fields are `BaseStatement`
+instances. It also checks that `truth_status` on the `KnewAt` and on its
+`object_` are independently set: Watson can in principle know a false
+proposition.
+"""
+
 
 def test_watson_knew_at_count(g):
     knew_edges = g.edges_from(i.watson.id, pred_type=schema.KnewAt)
@@ -116,8 +161,14 @@ def test_knew_at_truth_status_independent_of_proposition(g):
         assert edge.truth_status is not None
 
 
-# ── Query 6: BFS from Watson ──────────────────────────────────────────────────
-# What is in Watson's 2-hop neighborhood?
+"""
+## Q6 — BFS from Watson
+
+Breadth-first search from Watson's node, following asserted edges only, up to
+two hops. Verifies that the BFS returns multiple non-empty layers — Watson is
+connected to the rest of the graph.
+"""
+
 
 def test_bfs_from_watson_reaches_multiple_hops(g):
     # max 2 hops, asserted only
@@ -126,11 +177,17 @@ def test_bfs_from_watson_reaches_multiple_hops(g):
     assert any(len(layer) > 0 for layer in layers[1:])
 
 
-# ── Query 7: Truth status filter ──────────────────────────────────────────────
-# Are there any non-asserted statements? (Should be none in manual extraction)
+"""
+## Q7 — Truth status filter
+
+All statements in this graph were extracted manually from the story text and
+are ground truth, so all should have `truth_status == asserted_true`. This
+query asserts that no non-asserted statements exist, confirming that
+`truth_status` is set universally on every predicate instance.
+"""
+
 
 def test_all_statements_are_asserted_true(g):
-    # truth_status is universal on every predicate instance
     stmts = [v for v in g.by_id.values() if isinstance(v, schema.BaseStatement)]
     non_asserted = [s for s in stmts if s.truth_status.value != "asserted_true"]
     assert non_asserted == [], (
@@ -139,13 +196,20 @@ def test_all_statements_are_asserted_true(g):
     )
 
 
-# ── Query 8: Inverse lookup ───────────────────────────────────────────────────
-# Given a KnewAt edge, find everything that points AT the proposition it knows.
+"""
+## Q8 — Inverse lookup: what references the King-as-Count proposition?
+
+`e_king_as_count` is the `DisguisedAs` edge asserting that the King adopted
+the Count Von Kramm persona. Under the unified Statement model this edge is
+itself a member of V, so it can appear as the `object_` of higher-order
+predicates. This query checks that at least one `KnewAt` edge points at it —
+Watson learned this proposition when the King removed his mask.
+"""
+
 
 def test_king_as_count_referenced_by_watson_knew_at(g):
-    # What else knows or references the King-as-Count proposition?
-    referencing = g.edges_to(i.e_king_as_count.id)
     # Expected — Watson is the only character annotated as knowing this so far
+    referencing = g.edges_to(i.e_king_as_count.id)
     assert len(referencing) >= 1
     types = {type(e).__name__ for e in referencing}
     assert "KnewAt" in types

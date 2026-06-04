@@ -47,7 +47,17 @@ from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 
 
-# ── Truth status ───────────────────────────────────────────────────────────────
+"""
+## Truth status
+
+`TruthStatus` is the graph's explicit commitment to a proposition. Every
+predicate instance carries this field; the asserted graph is the projection
+where `truth_status == ASSERTED_TRUE`. Under the unified model, *presence*
+in the graph does not assert — `truth_status` carries the assertion explicitly.
+
+Lifecycle: `hypothetical → asserted_true | asserted_false → disputed | retracted`
+"""
+
 
 class TruthStatus(str, Enum):
     """Graph-level commitment to a proposition.
@@ -64,12 +74,18 @@ class TruthStatus(str, Enum):
     RETRACTED = "retracted"
 
 
-# ── Trait mixin classes ────────────────────────────────────────────────────────
-#
-# Traits are declarative semantic properties of predicate types (R1).
-# They belong to the class, not to any instance.
-# Trait must NOT inherit from BaseModel so that Pydantic's ModelMetaclass
-# stays in control of class construction.
+"""
+## Trait markers
+
+Traits are declarative semantic properties of predicate types — they belong
+to the class, not to any instance. `Trait` must not inherit from `BaseModel`
+so that Pydantic's `ModelMetaclass` stays in control of class construction.
+
+`Inverse[P]` is generic and names the paired predicate type. `get_inverse`
+resolves it at runtime by inspecting `__orig_bases__` — the list Python
+preserves from the class statement, including un-evaluated generic arguments.
+"""
+
 
 class Trait:
     """Marker base for all semantic traits."""
@@ -102,7 +118,20 @@ def get_inverse(cls: type['BaseStatement']) -> type['BaseStatement'] | None:
     return None
 
 
-# ── Base classes ───────────────────────────────────────────────────────────────
+"""
+## Base classes
+
+`EntityInstance` is the root of the hierarchy: every object in the graph has
+an `id`. For plain entities this is an authoritative URI or a corpus-local
+synthetic identifier; for predicate instances it is content-addressed via
+`statement_id`.
+
+`BaseStatement` extends `EntityInstance` with `subject`, `object_`, and
+`truth_status`. Because it inherits from `EntityInstance`, every predicate
+instance is a full member of V — it can be referenced by higher-order
+predicates like `KnewAt` without any special promotion.
+"""
+
 
 class EntityInstance(BaseModel):
     """Base class for all entity types (members of T_ent).
@@ -147,7 +176,18 @@ class BaseStatement(EntityInstance):
     truth_status: TruthStatus = TruthStatus.HYPOTHETICAL
 
 
-# ── Entity types (T_ent) ───────────────────────────────────────────────────────
+"""
+## Entity types (T_ent)
+
+Plain entity classes cover the domain concepts that appear in the stories:
+people, personas (disguises), locations, physical objects, documents, discrete
+events, points in time, and goal-directed plans.
+
+`Moment` carries a `narrator` field that doubles as an axis selector: absent
+means the objective story timeline; present means that person's epistemic
+timeline. One type handles both axes the corpus needs.
+"""
+
 
 class Person(EntityInstance):
     """A human character with an independent existence in the fictional world.
@@ -212,17 +252,23 @@ class Plan(EntityInstance):
     goal: str | None = None
 
 
-# ── Field group mixins (Φ components) ─────────────────────────────────────────
-#
-# Field groups are reusable FieldSchema components realizing Φ from the formal
-# definition. Each predicate class that uses a group inherits the corresponding
-# mixin. Named "field groups" (not "trait groups") to avoid collision with the
-# formal trait vocabulary (Symmetric, Transitive, Functional, Inverse, Rule).
-#
-# AssertionMixin has been removed. truth_status is now universal on
-# BaseStatement, eliminating the status-drift problem that arose when two
-# objects (an edge and a Statement entity) could carry truth_status
-# independently. Status lives in exactly one place.
+"""
+## Field group mixins (Φ components)
+
+Field groups are reusable bundles of fields — Pydantic mixins that predicate
+classes inherit alongside `BaseStatement`. Named "field groups" rather than
+"trait groups" to avoid collision with the formal trait vocabulary.
+
+`ProvenanceMixin` tracks where an assertion comes from in the text.
+`EpistemicMixin` records the narrator's in-world certainty, which is distinct
+from the pipeline's `extraction_confidence`.
+
+`AssertionMixin` has been removed. `truth_status` is now universal on
+`BaseStatement`, eliminating the status-drift problem that arose when two
+objects (an edge and a Statement entity) could carry `truth_status`
+independently — status now lives in exactly one place.
+"""
+
 
 class ProvenanceMixin(BaseModel):
     """Source-tracing fields. Required on every evidential predicate.
@@ -247,18 +293,23 @@ class EpistemicMixin(BaseModel):
     narrator_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
-# ── Predicate types (T_pred) ──────────────────────────────────────────────────
-#
-# Every predicate class inherits from BaseStatement (which inherits from
-# EntityInstance), so every instance has an id, subject, object_, and
-# truth_status. The id should be computed via statement_id() at construction.
-#
-# MRO convention: BaseStatement first, then field group mixins, then
-# Trait/Inverse markers last.
-#
-# Higher-order predicates have subject or object_ typed as BaseStatement,
-# meaning any predicate instance can fill that role. This is R8: higher-order
-# predication is a type declaration, not a runtime mechanism.
+"""
+## Predicate types (T_pred)
+
+Each predicate class inherits from `BaseStatement` (which inherits from
+`EntityInstance`), so every instance has an `id`, `subject`, `object_`, and
+`truth_status`. The `id` should be computed via `statement_id()` at
+construction.
+
+MRO convention: `BaseStatement` first, then field group mixins, then Trait
+and `Inverse` markers last.
+
+Higher-order predicates (`KnewAt`, `Contradicts`) accept `BaseStatement` as
+their subject or object type — any predicate instance can fill that role.
+This is a type declaration, not a runtime mechanism: every predicate instance
+is referable from birth.
+"""
+
 
 class AssociatedWith(BaseStatement, ProvenanceMixin):
     """Person is habitually connected to a location."""
@@ -355,7 +406,15 @@ class Executes(BaseStatement, ProvenanceMixin):
     object_: Plan
 
 
-# ── Forward reference resolution ───────────────────────────────────────────────
+"""
+## Forward reference resolution
+
+Pydantic's `model_rebuild()` resolves any `ForwardRef` annotations left from
+the class definitions above — in particular the `Inverse['HasTrueIdentity']`
+string annotation on `DisguisedAs`, which references a class declared later.
+This call must come after all classes are defined.
+"""
+
 
 for _cls in [
     Person, Persona, Location, Object, Document,

@@ -16,8 +16,17 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable, Type
 
-# Import base classes without importing the whole schema at module level.
-# Callers can pass any EntityInstance / BaseStatement subclasses.
+
+"""
+## Helpers
+
+Duck-typed predicates used during graph construction. Avoiding a direct
+import of `EntityInstance` and `BaseStatement` keeps `graph.py` decoupled
+from the schema module — any object that has the right attributes will be
+indexed correctly.
+"""
+
+
 def _is_entity(obj):
     return hasattr(obj, 'id') and not callable(obj)
 
@@ -25,15 +34,21 @@ def _is_statement(obj):
     return hasattr(obj, 'subject') and hasattr(obj, 'object_') and hasattr(obj, 'truth_status')
 
 
-class Graph:
-    """In-memory knowledge graph indexed for O(1) neighbor lookup.
+"""
+## Graph
 
-    Instances are indexed by id. Predicate instances are additionally
-    indexed by subject.id and by object_.id — supporting outward and
-    inward traversal. Since every predicate instance IS a member of V
-    (the unified Statement model), it is indexed by id and can itself
-    be the subject or object of higher-order predicates.
-    """
+`Graph` is an in-memory knowledge graph indexed for O(1) neighbor lookup.
+Instances are bucketed into three indexes: `by_id` for direct access,
+`out_edges` keyed by `subject.id` for forward traversal, and `in_edges`
+keyed by `object_.id` for backward traversal.
+
+Because predicate instances are also entities under the unified Statement
+model, they are indexed in `by_id` and can themselves appear as the
+subject or object of higher-order predicates.
+"""
+
+
+class Graph:
 
     def __init__(self, instances: Iterable):
         self.by_id: dict = {}
