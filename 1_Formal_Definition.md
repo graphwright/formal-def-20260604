@@ -64,7 +64,9 @@ recovered by reading the subject/object fields of predicate-typed instances.
 
 The **edge set** $E$ is derived, not primitive:
 
-$$E = \{v \in V : \tau(v) \in T_\text{pred}\}$$
+$$
+E = \\{v \in V : \tau(v) \in T_\text{pred}\\}
+$$
 
 Every member of $E$ is also a member of $V$. A predicate instance IS an entity
 instance — it has an id, it can be referenced by other predicate instances as
