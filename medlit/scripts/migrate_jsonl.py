@@ -53,6 +53,16 @@ SCHEMA_VERSION_V1 = "1.0.0"
 SCHEMA_VERSION_V2 = "2.0.0"
 
 
+"""
+## Helpers
+
+`statement_id` mirrors `medlit.src.base.statement_id` exactly so this script
+has no runtime dependency on the medlit package. `is_relationship_record` is
+the same duck-typed check used in `MedlitGraph`: a record is a relationship if
+it carries all three of `subject_id`, `predicate`, and `object_id`.
+"""
+
+
 def statement_id(subject_id: str, predicate: str, object_id: str) -> str:
     """Content-addressed ID matching medlit_schema.base.statement_id."""
     return f"stmt:{subject_id}:{predicate}:{object_id}"
@@ -61,6 +71,17 @@ def statement_id(subject_id: str, predicate: str, object_id: str) -> str:
 def is_relationship_record(record: dict) -> bool:
     """True if the record represents a relationship (has subject/predicate/object)."""
     return all(k in record for k in ("subject_id", "predicate", "object_id"))
+
+
+"""
+## Migration functions
+
+`migrate_relationship` adds `truth_status` and `stmt_id` to a relationship
+record. Records with a non-empty `contradicted_by` field are flagged as
+`"disputed"` rather than silently set to `"asserted_true"` — they require
+manual review. `migrate_entity` is a pass-through: entity records receive only
+a `schema_version` tag since they carry no predicate fields to migrate.
+"""
 
 
 def migrate_relationship(record: dict) -> tuple[dict, list[str]]:
@@ -106,6 +127,18 @@ def migrate_entity(record: dict) -> dict:
     r = dict(record)
     r["schema_version"] = SCHEMA_VERSION_V2
     return r
+
+
+"""
+## File migration
+
+`migrate_file` streams a JSONL file line by line, routing each record through
+`migrate_relationship` or `migrate_entity`, and writes the results to
+`output_path`. Blank lines and `#` comment lines are preserved verbatim so
+the migrated file stays human-readable. `dry_run=True` performs all parsing
+and validation but skips the write — useful for a pre-flight check before
+committing to an output directory.
+"""
 
 
 def migrate_file(
@@ -173,15 +206,22 @@ def migrate_file(
     return stats
 
 
-# ── Optional: restructure Supports/Refutes to point at stmt_ids ──────────────
-#
-# This is NOT run by default. It is a template for the optional follow-on
-# migration that rewires Supports/Refutes edges to reference relationship
-# stmt_ids instead of Hypothesis entity_ids. Run only if you want to take
-# advantage of higher-order Supports/Refutes.
-#
-# Precondition: the relationship JSONL has already been migrated (stmt_ids
-# exist) and is available as a lookup.
+"""
+## Optional: restructure Supports/Refutes
+
+Not run by default. `build_stmt_id_index` and `restructure_supports` together
+implement the optional follow-on migration that rewires `SUPPORTS`/`REFUTES`
+edges from Hypothesis `entity_id` targets to the relationship `stmt_id` targets
+they correspond to. This enables higher-order predication: a paper can assert
+`SUPPORTS` against a specific claim (a `stmt_id`) rather than against a vague
+Hypothesis entity.
+
+Precondition: the relationship JSONL must already have been migrated (all
+`stmt_id` fields populated) before calling `restructure_supports`. The
+`hypothesis_to_claim_map` must be constructed manually or via a separate
+analysis step — it cannot be derived from the JSONL alone.
+"""
+
 
 def build_stmt_id_index(relationship_jsonl: Path) -> dict[str, dict]:
     """
@@ -271,7 +311,14 @@ def restructure_supports(
     return stats
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+"""
+## CLI
+
+`main` wires `migrate_file` to an `argparse` CLI. It accepts an input JSONL
+path, an output path, and an optional `--dry-run` flag. Non-zero exit on
+parse errors; warnings (disputed records) are printed but do not cause failure.
+"""
+
 
 def main():
     parser = argparse.ArgumentParser(

@@ -47,6 +47,15 @@ from .base import (
 )
 
 
+"""
+## Evidence
+
+`EvidenceItem` is a lightweight reference to a source paper, carried on
+relationship instances. It records the paper ID, study type, optional
+sample size, and extraction confidence.
+"""
+
+
 class EvidenceItem(BaseModel):
     """
     Lightweight evidence reference for relationships.
@@ -61,6 +70,17 @@ class EvidenceItem(BaseModel):
     study_type: str
     sample_size: Optional[int] = None
     confidence: float = 0.5
+
+
+"""
+## Base relationship class
+
+`BaseMedicalRelationship` is the root of all medical assertion types. v2
+adds `truth_status` (defaulting to `HYPOTHETICAL`) and `stmt_id`
+(content-addressed, set at construction). Medical assertion relationships
+require non-empty `evidence_ids` — enforced by a field validator. Instances
+are frozen; update `truth_status` via `rel.model_copy(update={...})`.
+"""
 
 
 class BaseMedicalRelationship(BaseRelationship):
@@ -120,7 +140,16 @@ class BaseMedicalRelationship(BaseRelationship):
         return v
 
 
-# ── Medical: Therapeutic ─────────────────────────────────────────────────────
+"""
+## Medical relationships — Therapeutic
+
+Drug-disease and treatment relationships: what a drug treats, prevents,
+or causes, and its side effects. `Treats` is the primary relationship;
+`Causes`, `Prevents`, `IncreasesRisk`, `SideEffect`, `AssociatedWith`,
+`InteractsWith`, `ContraindicatedFor`, `DiagnosedBy`, and `ParticipatesIn`
+cover the surrounding clinical and genomic context.
+"""
+
 
 class Treats(BaseMedicalRelationship):
     """
@@ -282,7 +311,16 @@ class ParticipatesIn(BaseMedicalRelationship):
         return "PARTICIPATES_IN"
 
 
-# ── Biological ───────────────────────────────────────────────────────────────
+"""
+## Biological relationships
+
+Gene-protein relationships: `Encodes` (Gene → Protein) and its declared
+inverse `IsEncodedBy`. `BindsTo`, `Inhibits`, `Upregulates`, and
+`Downregulates` cover molecular interactions that don't require evidence
+from clinical papers, so they inherit directly from `BaseRelationship`
+rather than `BaseMedicalRelationship`.
+"""
+
 
 class Encodes(BaseRelationship, Inverse['IsEncodedBy']):
     """
@@ -355,7 +393,16 @@ class Indicates(BaseMedicalRelationship):
         return "INDICATES"
 
 
-# ── Research Metadata ────────────────────────────────────────────────────────
+"""
+## Research metadata relationships
+
+Bibliographic and structural relationships between papers, authors, and
+clinical trials. Unlike medical assertion relationships, these don't require
+`evidence_ids` — they represent bibliographic facts (authorship, citation)
+rather than medical claims. Frozen in v2 for consistency with
+`BaseMedicalRelationship`.
+"""
+
 
 class ResearchRelationship(BaseRelationship):
     """
@@ -431,7 +478,17 @@ class SameAs(ResearchRelationship, Symmetric):
         return "SAME_AS"
 
 
-# ── Hypothesis / Scientific Method ───────────────────────────────────────────
+"""
+## Hypothesis and scientific method relationships
+
+Relationships between hypotheses, papers, and evidence. `Predicts`,
+`TestedBy`, `Supports`, `Refutes`, and `Generates` model the scientific
+method as a graph. In v2, `Supports` and `Refutes` may point at a
+relationship `stmt_id` rather than a `Hypothesis` entity, enabling
+evidence tracking at the claim level rather than only at the hypothesis
+level.
+"""
+
 
 class Predicts(BaseMedicalRelationship):
     """Hypothesis -[PREDICTS]-> Disease/Outcome"""
@@ -509,7 +566,16 @@ class Generates(BaseMedicalRelationship):
         return "GENERATES"
 
 
-# ── New in v2: Higher-order dispute tracking ──────────────────────────────────
+"""
+## Higher-order dispute tracking — `Contradicts`
+
+`Contradicts` is a higher-order predicate: both `subject_id` and `object_id`
+are relationship `stmt_ids`, not entity IDs. It records a direct conflict
+between two medical claims. Symmetric: storing one direction suffices. Does
+not inherit from `BaseMedicalRelationship` — the contradiction is a
+structural observation, not itself a medical assertion requiring evidence.
+"""
+
 
 class Contradicts(ResearchRelationship, Symmetric):
     """
@@ -549,19 +615,16 @@ class Contradicts(ResearchRelationship, Symmetric):
         return "CONTRADICTS"
 
 
-# ── Relationship factory ──────────────────────────────────────────────────────
-# Retained for backward compatibility with the ingestion pipeline.
-# New code should construct relationship instances directly.
-# Note: create_relationship cannot populate stmt_id automatically because
-# it would need to call statement_id(), which is now imported from base.
-# Callers should set stmt_id explicitly:
-#
-#   rel = Treats(
-#       subject_id=..., object_id=..., predicate="TREATS",
-#       stmt_id=statement_id(subject_id, "TREATS", object_id),
-#       truth_status=TruthStatus.ASSERTED_TRUE,
-#       ...
-#   )
+"""
+## Relationship factory
+
+`RELATIONSHIP_TYPE_MAP` and `create_relationship` are retained for backward
+compatibility with the ingestion pipeline. New code should construct
+relationship instances directly. `auto_stmt_id=True` (the default) injects
+a content-addressed `stmt_id` automatically; set `auto_stmt_id=False` when
+loading pre-computed `stmt_ids` from JSONL.
+"""
+
 
 RELATIONSHIP_TYPE_MAP = {
     "TREATS": Treats,

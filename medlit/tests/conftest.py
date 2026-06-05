@@ -13,6 +13,17 @@ from pathlib import Path
 from medlit.src.graph import MedlitGraph
 
 
+"""
+## Fixtures
+
+`jsonl_dir` resolves the path to migrated JSONL files — either from the
+`--jsonl-dir` CLI option or from the conventional fallback location
+`tests/data/migrated/`. Tests that require a loaded graph are skipped
+automatically if no files are found. `g` is a session-scoped `MedlitGraph`
+built once and shared across all tests.
+"""
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--jsonl-dir",

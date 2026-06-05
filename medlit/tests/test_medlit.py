@@ -17,6 +17,17 @@ from medlit.src.graph import MedlitGraph
 from medlit.src.base import statement_id, TruthStatus
 
 
+"""
+## Test configuration
+
+Trait sets and predicate constraints are declared at module level so
+individual tests can reference them without re-computing.
+`SYMMETRIC_PREDICATES` and `TRANSITIVE_PREDICATES` mirror the trait
+declarations in `medlit.src.relationship`. `PREDICATE_CONSTRAINTS` encodes
+the domain/range rules from `MedlitDomain` for the data-level R6 check.
+"""
+
+
 # Predicates that carry the Symmetric trait in v2.
 # For these, the reverse direction should either be stored or be derivable.
 SYMMETRIC_PREDICATES = {"INTERACTS_WITH", "SAME_AS", "CONTRADICTS"}
@@ -57,7 +68,13 @@ PREDICATE_CONSTRAINTS = {
 }
 
 
-# ── Sanity: graph loaded ──────────────────────────────────────────────────────
+"""
+## Sanity
+
+Verify the loader found and parsed JSONL records and that `summary()`
+runs without error — the first things to check before all others.
+"""
+
 
 def test_graph_loaded(g: MedlitGraph):
     """
@@ -84,7 +101,15 @@ def test_summary_prints(g: MedlitGraph, capsys):
     assert s["relationships"] > 0
 
 
-# ── M1–M4: Migration correctness ─────────────────────────────────────────────
+"""
+## M1–M5 — Migration correctness
+
+These tests verify that `migrate_jsonl.py` ran correctly on every loaded
+file: all relationships carry `truth_status` and `stmt_id`; `stmt_id`
+values are deterministic and unique; and all `truth_status` strings are
+members of the `TruthStatus` enum.
+"""
+
 
 def test_m1_all_relationships_have_truth_status(g: MedlitGraph):
     """
@@ -194,7 +219,15 @@ def test_m5_truth_status_values_are_valid(g: MedlitGraph):
     )
 
 
-# ── S1–S4: Schema integrity ───────────────────────────────────────────────────
+"""
+## S1–S4 — Schema integrity
+
+Field-level constraints that should hold regardless of migration: medical
+relationships must have evidence, confidence scores must be in range,
+entity types must respect predicate domain/range (the data-level R6 check),
+and canonical entities must carry their ontology IDs.
+"""
+
 
 def test_s1_evidence_required_predicates_have_evidence(g: MedlitGraph):
     """
@@ -314,7 +347,15 @@ def test_s4_canonical_entities_have_ontology_ids(g: MedlitGraph):
     )
 
 
-# ── I1–I4: Referential integrity ─────────────────────────────────────────────
+"""
+## I1–I4 — Referential integrity
+
+Every ID that appears in a record's reference fields must resolve to an
+existing record: `evidence_ids` must point to Evidence entities,
+`source_papers` to Paper entities, `Contradicts` ends to relationship
+`stmt_ids`, and `Cites` ends to Paper entities.
+"""
+
 
 def test_i1_evidence_ids_reference_existing_evidence(g: MedlitGraph):
     """
@@ -417,7 +458,15 @@ def test_i4_cites_references_existing_papers(g: MedlitGraph):
     )
 
 
-# ── T1–T4: Trait invariants ───────────────────────────────────────────────────
+"""
+## T1–T4 — Trait invariants
+
+Structural invariants implied by the trait declarations in
+`medlit.src.relationship`: `Symmetric` predicates have reverse edges stored,
+`SubtypeOf` (Transitive) forms a DAG, transitive closure behaves correctly
+on real data, and `DISPUTED` relationships name their contradicting sources.
+"""
+
 
 def test_t1_symmetric_predicates_have_reverse_edges(g: MedlitGraph):
     """
@@ -541,7 +590,15 @@ def test_t4_disputed_relationships_have_contradicted_by(g: MedlitGraph):
     )
 
 
-# ── E1–E2: Epistemic completeness ────────────────────────────────────────────
+"""
+## E1–E2 — Epistemic completeness
+
+After migration, no record should remain `HYPOTHETICAL`, and
+`ASSERTED_TRUE` should be the dominant truth status. These tests catch
+migration gaps and pipeline bugs where new records are added without
+promotion.
+"""
+
 
 def test_e1_no_hypothetical_relationships_in_asserted_graph(g: MedlitGraph):
     """

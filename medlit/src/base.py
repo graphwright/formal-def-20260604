@@ -18,10 +18,15 @@ from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
-# ── BaseRelationship ─────────────────────────────────────────────────────────
-# Minimal base replacing the kgschema.relationship.BaseRelationship dependency.
-# subject_id/object_id remain str for pipeline and Postgres compatibility;
-# typed subject/object fields (R6) are deferred.
+"""
+## BaseRelationship
+
+Minimal base class replacing the external `kgschema` dependency.
+`subject_id` and `object_id` remain `str` for pipeline and Postgres
+compatibility — typed subject/object fields (R6) are deferred pending a
+schema update.
+"""
+
 
 class BaseRelationship(BaseModel):
     """Base class for all relationship types."""
@@ -33,7 +38,16 @@ class BaseRelationship(BaseModel):
         return self.predicate
 
 
-# ── Existing base models (unchanged) ────────────────────────────────────────
+"""
+## Extraction provenance and metadata
+
+Support models for recording *how* a record was produced: which pipeline
+version ran, which LLM was used, which prompt template was applied, and
+when and where extraction happened. These fields are orthogonal to the
+medical content — they enable reproducibility, debugging, and pipeline
+evolution tracking.
+"""
+
 
 class ModelInfo(BaseModel):
     """Information about the model used for extraction."""
@@ -157,7 +171,21 @@ class Measurement(BaseModel):
     measurement_context: Optional[str] = None
 
 
-# ── New in v2: Truth status ──────────────────────────────────────────────────
+"""
+## Truth status
+
+`TruthStatus` is the graph's explicit commitment to a proposition. Presence
+in the graph does NOT assert — `truth_status` carries the assertion
+explicitly. The medlit variant adds `SUPERSEDED` to the Holmes set: a
+finding may be correct within its original population and methodology but
+replaced by stronger subsequent evidence. This is distinct from
+`ASSERTED_FALSE` (the claim was wrong) and `RETRACTED` (the paper was
+formally withdrawn).
+
+Lifecycle: `hypothetical → asserted_true | asserted_false → disputed |
+retracted | superseded`
+"""
+
 
 class TruthStatus(str, Enum):
     """
@@ -184,7 +212,19 @@ class TruthStatus(str, Enum):
     SUPERSEDED = "superseded"   # medlit addition: replaced by stronger evidence
 
 
-# ── New in v2: Content-addressed relationship IDs ────────────────────────────
+"""
+## Content-addressed relationship IDs
+
+`statement_id` produces a deterministic string key for a proposition
+`(subject_id, predicate, object_id)`. Two records expressing the same
+claim compute the same key, enabling O(1) deduplication across extraction
+runs and allowing higher-order predicates (`Contradicts`) to reference
+relationships by stable identity rather than by UUID.
+
+`statement_uuid` derives a UUID5 from the same key for systems (e.g. the
+existing Postgres storage layer) that require a UUID primary key.
+"""
+
 
 def statement_id(subject_id: str, predicate_name: str, object_id: str) -> str:
     """
@@ -224,20 +264,17 @@ def statement_uuid(subject_id: str, predicate_name: str, object_id: str) -> uuid
     return uuid.uuid5(uuid.NAMESPACE_URL, sid)
 
 
-# ── New in v2: Trait system ──────────────────────────────────────────────────
-#
-# Traits are declarative semantic properties of predicate *types*, not
-# instances. They belong to the class (via mixin inheritance), never to
-# any individual relationship instance. This matches the Holmes formal
-# definition's Tr(p) ⊆ Trait.
-#
-# Trait must not inherit from BaseModel so that Pydantic's ModelMetaclass
-# stays in control of class construction.
-#
-# Usage in medlit:
-#     class InteractsWith(BaseMedicalRelationship, Symmetric): ...
-#     class SubtypeOf(BaseMedicalRelationship, Transitive): ...
-#     class SameAs(ResearchRelationship, Symmetric): ...
+"""
+## Trait markers
+
+Traits are declarative semantic properties of predicate types — they belong
+to the class, not to any instance. The set matches the Holmes formal
+definition: `Symmetric`, `Transitive`, `Functional`, `InverseFunctional`,
+and `Inverse[P]`. Usage in medlit: `InteractsWith` is `Symmetric`;
+`SubtypeOf` is `Transitive`; `Encodes` and `IsEncodedBy` are mutual
+`Inverse`s.
+"""
+
 
 class Trait:
     """Marker base for all semantic traits."""
@@ -296,7 +333,15 @@ def get_inverse(cls: type) -> type | None:
     return None
 
 
-# ── Unchanged: provenance metadata classes ───────────────────────────────────
+"""
+## Provenance metadata
+
+Detailed provenance classes capturing the extraction pipeline version, the
+prompt used, execution context, and entity resolution statistics. These are
+optional on `ExtractionProvenance` — older records may carry only
+`model_info` (the legacy field).
+"""
+
 
 class ExtractionPipelineInfo(BaseModel):
     """

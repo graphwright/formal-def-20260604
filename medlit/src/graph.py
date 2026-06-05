@@ -26,7 +26,16 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+"""
+## Helpers
+
+Duck-typed predicates for classifying JSONL records during graph
+construction. A record is a *relationship* if it carries `subject_id`,
+`predicate`, and `object_id`. A record is an *entity* if it carries
+`entity_type` or an `entity_id` without a `predicate`. Records that match
+neither (schema metadata, comment lines) are silently ignored.
+"""
+
 
 def _is_relationship(record: dict) -> bool:
     return all(k in record for k in ("subject_id", "predicate", "object_id"))
@@ -38,7 +47,19 @@ def _is_entity(record: dict) -> bool:
     )
 
 
-# ── Graph ────────────────────────────────────────────────────────────────────
+"""
+## MedlitGraph
+
+In-memory knowledge graph indexed for O(1) neighbour lookup over medlit
+JSONL records. Unlike the Holmes `Graph`, relationships are stored as plain
+dicts for fast bulk loading — Pydantic validation is a separate step.
+
+Five indexes: `out_edges` and `in_edges` for traversal, `by_stmt_id` for
+content-addressed lookup, `by_uuid` for legacy UUID lookup, and `entities`
+for entity resolution. Multiple JSONL files are loaded and merged in sorted
+order so results are deterministic.
+"""
+
 
 class MedlitGraph:
     """
