@@ -7,9 +7,9 @@ Each query section exercises a different schema feature.
 """
 
 import pytest
-import holmes_schema as schema
-import scandal_instances as i
-from graph import Graph
+import src.holmes_schema as schema
+import src.scandal_instances as i
+from src.graph import Graph
 
 
 @pytest.fixture(scope="session")

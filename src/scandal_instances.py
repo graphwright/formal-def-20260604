@@ -31,7 +31,7 @@ is now simply the `DisguisedAs` edge itself, pointed at directly by
 `KnewAt`.
 """
 
-from holmes_schema import (
+from .holmes_schema import (
     AssociatedWith,
     BaseStatement,
     DisguisedAs,

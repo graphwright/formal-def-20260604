@@ -10,7 +10,7 @@ Tests that require a loaded graph are skipped if no JSONL files are found.
 
 import pytest
 from pathlib import Path
-from medlit_graph import MedlitGraph
+from medlit.src.graph import MedlitGraph
 
 
 def pytest_addoption(parser):

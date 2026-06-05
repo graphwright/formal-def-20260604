@@ -36,8 +36,8 @@ Migration path for existing JSONL
 
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from kgschema.relationship import BaseRelationship
-from medlit_schema.base import (
+from .base import (
+    BaseRelationship,
     Measurement,
     TruthStatus,
     Symmetric,

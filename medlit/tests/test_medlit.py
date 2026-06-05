@@ -13,8 +13,8 @@ Run:
 
 import pytest
 from collections import defaultdict
-from medlit_graph import MedlitGraph
-from medlit_schema.base import statement_id, TruthStatus
+from medlit.src.graph import MedlitGraph
+from medlit.src.base import statement_id, TruthStatus
 
 
 # Predicates that carry the Symmetric trait in v2.

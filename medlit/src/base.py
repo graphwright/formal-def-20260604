@@ -14,8 +14,23 @@ Changes from 1.0.0:
 from typing import Optional, Generic, TypeVar, ForwardRef, get_args, get_origin
 import sys
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
+
+
+# ── BaseRelationship ─────────────────────────────────────────────────────────
+# Minimal base replacing the kgschema.relationship.BaseRelationship dependency.
+# subject_id/object_id remain str for pipeline and Postgres compatibility;
+# typed subject/object fields (R6) are deferred.
+
+class BaseRelationship(BaseModel):
+    """Base class for all relationship types."""
+    subject_id: str
+    object_id: str
+    predicate: str
+
+    def get_edge_type(self) -> str:
+        return self.predicate
 
 
 # ── Existing base models (unchanged) ────────────────────────────────────────
