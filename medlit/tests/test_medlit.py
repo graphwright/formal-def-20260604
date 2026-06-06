@@ -53,13 +53,15 @@ PREDICATE_CONSTRAINTS = {
     "PREVENTS":          ({"drug"},                  {"disease"}),
     "INCREASES_RISK":    ({"gene", "mutation"},      {"disease"}),
     "SIDE_EFFECT":       ({"drug"},                  {"symptom", "disease"}),
-    "INTERACTS_WITH":    ({"drug"},                  {"drug"}),
+    # Drug-protein and protein-protein interactions are biologically valid.
+    "INTERACTS_WITH":    ({"drug", "protein"},       {"drug", "protein"}),
     "CONTRAINDICATED_FOR": ({"drug"},                {"disease"}),
     "DIAGNOSED_BY":      ({"disease"},               {"procedure", "biomarker"}),
     "PARTICIPATES_IN":   ({"gene", "protein"},       {"pathway"}),
     "ENCODES":           ({"gene"},                  {"protein"}),
     "BINDS_TO":          ({"drug", "protein"},       {"protein"}),
-    "INHIBITS":          ({"drug", "protein"},       {"protein", "pathway"}),
+    # Gene inhibition (e.g. RNAi, knockdown) is valid alongside drug inhibition.
+    "INHIBITS":          ({"drug", "protein"},       {"protein", "pathway", "gene"}),
     "CITES":             ({"paper"},                 {"paper"}),
     "AUTHORED_BY":       ({"paper"},                 {"author"}),
     "SUPPORTS":          ({"evidence"},              {"hypothesis"}),
@@ -292,8 +294,10 @@ def test_s3_domain_range_spot_check(g: MedlitGraph):
             obj_entity = g.find_entity(r.get("object_id", ""))
             if subj_entity is None or obj_entity is None:
                 continue  # unresolvable; caught by integrity tests
-            subj_type = subj_entity.get("entity_type", "")
-            obj_type = obj_entity.get("entity_type", "")
+            subj_type = subj_entity.get("entity_type") or ""
+            obj_type = obj_entity.get("entity_type") or ""
+            if not subj_type or not obj_type:
+                continue  # type unknown (prov:, DBPedia:, etc.); can't check constraint
             if allowed_subj and subj_type not in allowed_subj:
                 violations.append({
                     "predicate": pred,

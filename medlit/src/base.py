@@ -334,6 +334,47 @@ def get_inverse(cls: type) -> type | None:
 
 
 """
+## Entity type inference
+
+`infer_entity_type` maps canonical authority prefixes to the entity type
+vocabulary used in predicate domain/range constraints. Inference is
+conservative: only authorities with unambiguous type semantics are mapped.
+`prov:` (provisional), `DBPedia:`, and other unknown prefixes return `None`
+so callers can skip constraint checks rather than report false violations.
+"""
+
+
+def infer_entity_type(entity_id: str) -> str | None:
+    """
+    Infer entity type from authority prefix.
+
+    Returns None for prefixes where the type cannot be reliably determined
+    (DBPedia, prov:, bare strings). Callers should skip domain/range checks
+    when None is returned rather than treating it as a violation.
+
+    Examples:
+        >>> infer_entity_type("RxNorm:278739")
+        'drug'
+        >>> infer_entity_type("HGNC:7010")
+        'gene'
+        >>> infer_entity_type("prov:abc123")
+        # returns None
+    """
+    if entity_id.startswith("RxNorm:"):
+        return "drug"
+    if entity_id.startswith(("HGNC:", "NCBIGene:")):
+        return "gene"
+    if entity_id.startswith("UniProt:"):
+        return "protein"
+    if entity_id.startswith(("PMC", "PMID:", "DOI:")):
+        return "paper"
+    # MeSH:D codes cover diseases, drugs, chemicals, and anatomy — too
+    # ambiguous to map reliably. UMLS:C is similarly broad. Return None
+    # so callers skip the constraint check rather than flag false violations.
+    return None
+
+
+"""
 ## Provenance metadata
 
 Detailed provenance classes capturing the extraction pipeline version, the

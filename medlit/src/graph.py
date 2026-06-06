@@ -25,6 +25,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Iterable, Iterator
 
+from medlit.src.base import infer_entity_type
+
 
 """
 ## Helpers
@@ -92,6 +94,10 @@ class MedlitGraph:
             elif _is_entity(record):
                 eid = record.get("entity_id") or record.get("id")
                 if eid:
+                    if not record.get("entity_type"):
+                        inferred = infer_entity_type(eid)
+                        if inferred:
+                            record = {**record, "entity_type": inferred}
                     self.entities[eid] = record
             # Records that are neither (e.g. schema metadata) are ignored.
 

@@ -312,6 +312,121 @@ def restructure_supports(
 
 
 """
+## Cycle cleaning — `clean_subtype_of_cycles`
+
+`SUBTYPE_OF` is declared `Transitive` and must form a DAG. LLM extraction
+sometimes produces self-loops (`A → A`) or mutual cycles (`A → B` and
+`B → A`). `clean_subtype_of_cycles` removes these from a JSONL file using
+iterative DFS back-edge detection: self-loops are removed unconditionally;
+longer cycles have their back edges (the edges that close the cycle)
+removed. All other records pass through unchanged.
+"""
+
+
+def _find_subtype_back_edges(edges: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    """
+    Return the set of back edges (that create cycles) in the SUBTYPE_OF
+    subgraph using iterative DFS. Self-loops are always back edges.
+    """
+    back_edges: set[tuple[str, str]] = set()
+    # Self-loops are trivially back edges
+    for s, o in edges:
+        if s == o:
+            back_edges.add((s, o))
+
+    clean = edges - back_edges
+    all_nodes: set[str] = set()
+    for s, o in clean:
+        all_nodes.add(s)
+        all_nodes.add(o)
+
+    adj: dict[str, list[str]] = {n: [] for n in all_nodes}
+    for s, o in clean:
+        adj[s].append(o)
+
+    visited: set[str] = set()
+    for start in all_nodes:
+        if start in visited:
+            continue
+        stack: list[tuple[str, object]] = [(start, iter(adj[start]))]
+        path: list[str] = [start]
+        path_set: set[str] = {start}
+        visited.add(start)
+        while stack:
+            node, children = stack[-1]
+            try:
+                child = next(children)  # type: ignore[call-overload]
+                if child in path_set:
+                    back_edges.add((node, child))
+                elif child not in visited:
+                    visited.add(child)
+                    path.append(child)
+                    path_set.add(child)
+                    stack.append((child, iter(adj[child])))
+            except StopIteration:
+                stack.pop()
+                if path and path[-1] == node:
+                    path.pop()
+                    path_set.discard(node)
+    return back_edges
+
+
+def clean_subtype_of_cycles(input_path: Path, output_path: Path) -> dict:
+    """
+    Remove SUBTYPE_OF self-loops and cycle-creating back edges from a JSONL.
+
+    Returns a stats dict with keys:
+      total, removed, kept, errors
+    """
+    # Pass 1: collect all SUBTYPE_OF (subject_id, object_id) pairs
+    subtype_edges: set[tuple[str, str]] = set()
+    with input_path.open() as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            try:
+                r = json.loads(stripped)
+                if r.get("predicate") == "SUBTYPE_OF":
+                    subtype_edges.add((r["subject_id"], r["object_id"]))
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+    back_edges = _find_subtype_back_edges(subtype_edges)
+
+    # Pass 2: rewrite, dropping records whose (subject_id, object_id)
+    # is in back_edges
+    stats = {"total": 0, "removed": 0, "kept": 0, "errors": []}
+    output_lines = []
+    with input_path.open() as f:
+        for lineno, raw in enumerate(f, 1):
+            stripped = raw.rstrip("\n")
+            if not stripped or stripped.startswith("#"):
+                output_lines.append(raw)
+                continue
+            stats["total"] += 1
+            try:
+                r = json.loads(stripped)
+            except json.JSONDecodeError as e:
+                stats["errors"].append(f"Line {lineno}: {e}")
+                output_lines.append(raw)
+                continue
+            if r.get("predicate") == "SUBTYPE_OF":
+                key = (r.get("subject_id", ""), r.get("object_id", ""))
+                if key in back_edges:
+                    stats["removed"] += 1
+                    continue
+            output_lines.append(raw)
+            stats["kept"] += 1
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as f:
+        f.writelines(output_lines)
+
+    return stats
+
+
+"""
 ## CLI
 
 `main` wires `migrate_file` to an `argparse` CLI. It accepts an input JSONL
