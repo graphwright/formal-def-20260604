@@ -1,0 +1,4 @@
+mkdir -p v2
+for f in *.jsonl; do
+    pdm run python ~/tmp/formal-def-20260604/medlit/scripts/migrate_jsonl.py "$f" "v2/${f##*/}"
+done
