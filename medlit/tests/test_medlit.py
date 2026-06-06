@@ -40,8 +40,11 @@ TRANSITIVE_PREDICATES = {"SUBTYPE_OF"}
 EVIDENCE_REQUIRED_PREDICATES = {
     "TREATS", "CAUSES", "PREVENTS", "INCREASES_RISK", "SIDE_EFFECT",
     "ASSOCIATED_WITH", "INTERACTS_WITH", "CONTRAINDICATED_FOR",
-    "DIAGNOSED_BY", "PARTICIPATES_IN", "INDICATES", "SUBTYPE_OF",
+    "DIAGNOSED_BY", "PARTICIPATES_IN", "INDICATES",
     "PREDICTS", "TESTED_BY", "SUPPORTS", "REFUTES", "GENERATES",
+    # SUBTYPE_OF excluded: taxonomic relationships are structural facts
+    # (from disease ontologies) rather than paper-sourced claims and
+    # are not expected to carry evidence_ids.
 }
 
 # Expected domain/range pairs from MedlitDomain.predicate_constraints.
